@@ -79,38 +79,43 @@ def generate_article():
     data = request.json
     theme = data.get('theme', '')
     requirement = data.get('requirement', '')
-
-    print(f"Received request - Theme: {theme}, Requirement: {requirement}")
+    sentence_id = data.get('sentence_id', 0)
 
     if not theme:
-        return Response(json.dumps({"success": False, "message": "主题不能为空"}), status=400, mimetype='application/json')
+        return jsonify({"success": False, "message": "主题不能为空"}), 400
 
     prompt = f"主题：{theme}\n要求：{requirement}\n请根据以上主题和要求生成一篇文章。"
 
-    def generate():
-        try:
-            resp = chat_comp.do(model="ERNIE-Speed-8K", messages=[{
-                "role": "user",
-                "content": prompt
-            }], stream=True)
+    try:
+        resp = chat_comp.do(model="ERNIE-Speed-8K", messages=[{
+            "role": "user",
+            "content": prompt
+        }], stream=True)
 
-            current_sentence = ""
-            for chunk in resp:
-                if 'result' in chunk:
-                    content = chunk['result']
-                    current_sentence += content
+        for i, chunk in enumerate(resp):
+            if i == sentence_id:
+                # 确保所有字段都是 JSON 可序列化的
+                serializable_chunk = {
+                    "id": chunk.get("id", ""),
+                    "object": chunk.get("object", ""),
+                    "created": chunk.get("created", 0),
+                    "sentence_id": chunk.get("sentence_id", 0),
+                    "is_end": chunk.get("is_end", False),
+                    "is_truncated": chunk.get("is_truncated", False),
+                    "result": chunk.get("result", ""),
+                    "need_clear_history": chunk.get("need_clear_history", False),
+                    "finish_reason": chunk.get("finish_reason", ""),
+                    "usage": {
+                        "prompt_tokens": chunk.get("usage", {}).get("prompt_tokens", 0),
+                        "completion_tokens": chunk.get("usage", {}).get("completion_tokens", 0),
+                        "total_tokens": chunk.get("usage", {}).get("total_tokens", 0)
+                    }
+                }
+                return jsonify(serializable_chunk)
+        
+        # 如果没有更多内容，返回结束标志
+        return jsonify({"is_end": True})
 
-                    # 检查是否有完整的句子
-                    if current_sentence.endswith('。') or current_sentence.endswith('！') or current_sentence.endswith('？'):
-                        yield json.dumps({'content': current_sentence}).encode('utf-8')
-                        current_sentence = ""
-
-            if current_sentence:  # 输出最后可能不完整的句子
-                yield json.dumps({'content': current_sentence}).encode('utf-8')
-            yield json.dumps({'end': True}).encode('utf-8')
-
-        except Exception as e:
-            print(f"Error: {str(e)}")
-            yield json.dumps({'error': f'生成文章失败: {str(e)}'}).encode('utf-8')
-
-    return Response(generate(), mimetype='application/json', headers={'Transfer-Encoding': 'chunked'})
+    except Exception as e:
+        print(f"Error: {str(e)}")
+        return jsonify({'error': f'生成文章失败: {str(e)}'}), 500
