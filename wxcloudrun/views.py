@@ -6,7 +6,7 @@ from wxcloudrun.model import Counters
 from wxcloudrun.response import make_succ_empty_response, make_succ_response, make_err_response
 import qianfan
 import json
-
+import os
 
 @app.route('/')
 def index():
