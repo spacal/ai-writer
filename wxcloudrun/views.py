@@ -5,7 +5,6 @@ from wxcloudrun.dao import delete_counterbyid, query_counterbyid, insert_counter
 from wxcloudrun.model import Counters
 from wxcloudrun.response import make_succ_empty_response, make_succ_response, make_err_response
 import qianfan
-import json
 import os
 
 @app.route('/')
@@ -73,6 +72,9 @@ os.environ["QIANFAN_ACCESS_KEY"] = "901c37dc426b4c6fbd4d60c22ef939f1"
 os.environ["QIANFAN_SECRET_KEY"] = "bc5650a148c94378a52eee38491f7556"
 
 chat_comp = qianfan.ChatCompletion()
+
+# 用于存储生成的内容
+generated_content = {}
 
 @app.route('/api/generate-article', methods=['POST'])
 def generate_article():
