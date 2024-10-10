@@ -95,23 +95,25 @@ def generate_article():
             }], stream=True)
 
             full_article = ""
+            current_sentence = ""
             for chunk in resp:
-                print(f"Received chunk: {chunk}")
                 if 'result' in chunk:
                     content = chunk['result']
                     full_article += content
-                    yield f"data: {json.dumps({'content': content})}\n"
-                
+                    current_sentence += content
+
+                    # 检查是否有完整的句子
+                    if current_sentence.endswith('。') or current_sentence.endswith('！') or current_sentence.endswith('？'):
+                        yield f"data: {json.dumps({'content': current_sentence})}\n\n"
+                        current_sentence = ""
+
                 if chunk.get('is_end', False):
-                    if full_article.strip():
-                        print(f"Full generated article: {full_article}")
-                        yield f"data: {json.dumps({'end': True, 'full_article': full_article})}\n"
-                    else:
-                        print("Warning: Generated article is empty")
-                        yield f"data: {json.dumps({'error': '生成的文章为空'})}\n"
+                    if current_sentence:  # 输出最后可能不完整的句子
+                        yield f"data: {json.dumps({'content': current_sentence})}\n\n"
+                    yield f"data: {json.dumps({'end': True, 'full_article': full_article})}\n\n"
 
         except Exception as e:
             print(f"Error: {str(e)}")
-            yield f"data: {json.dumps({'error': f'生成文章失败: {str(e)}'})}\n"
+            yield f"data: {json.dumps({'error': f'生成文章失败: {str(e)}'})}\n\n"
 
     return Response(generate(), content_type='text/event-stream')
