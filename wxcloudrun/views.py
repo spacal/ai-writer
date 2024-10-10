@@ -83,7 +83,7 @@ def generate_article():
     print(f"Received request - Theme: {theme}, Requirement: {requirement}")
 
     if not theme:
-        return jsonify({"success": False, "message": "主题不能为空"}), 400
+        return Response(json.dumps({"success": False, "message": "主题不能为空"}), status=400, mimetype='application/json')
 
     prompt = f"主题：{theme}\n要求：{requirement}\n请根据以上主题和要求生成一篇文章。"
 
@@ -94,26 +94,23 @@ def generate_article():
                 "content": prompt
             }], stream=True)
 
-            full_article = ""
             current_sentence = ""
             for chunk in resp:
                 if 'result' in chunk:
                     content = chunk['result']
-                    full_article += content
                     current_sentence += content
 
                     # 检查是否有完整的句子
                     if current_sentence.endswith('。') or current_sentence.endswith('！') or current_sentence.endswith('？'):
-                        yield f"data: {json.dumps({'content': current_sentence})}\n\n"
+                        yield json.dumps({'content': current_sentence}).encode('utf-8')
                         current_sentence = ""
 
-                if chunk.get('is_end', False):
-                    if current_sentence:  # 输出最后可能不完整的句子
-                        yield f"data: {json.dumps({'content': current_sentence})}\n\n"
-                    yield f"data: {json.dumps({'end': True, 'full_article': full_article})}\n\n"
+            if current_sentence:  # 输出最后可能不完整的句子
+                yield json.dumps({'content': current_sentence}).encode('utf-8')
+            yield json.dumps({'end': True}).encode('utf-8')
 
         except Exception as e:
             print(f"Error: {str(e)}")
-            yield f"data: {json.dumps({'error': f'生成文章失败: {str(e)}'})}\n\n"
+            yield json.dumps({'error': f'生成文章失败: {str(e)}'}).encode('utf-8')
 
-    return Response(generate(), content_type='text/event-stream')
+    return Response(generate(), mimetype='application/json', headers={'Transfer-Encoding': 'chunked'})
